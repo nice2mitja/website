@@ -16,11 +16,15 @@ import type {
   GrantApplication,
   GrantSummary,
   StockEntry,
+  TaxSphere,
+  VatRate,
 } from '@/types/accounting'
 import {
   REVENUE_SOURCE_LABELS,
   REVENUE_GROUPS,
   EXPENSE_PAID_FROM_LABELS,
+  TAX_SPHERE_LABELS,
+  VAT_RATE_LABELS,
 } from '@/types/accounting'
 import { useSort } from '@/composables/useSort'
 
@@ -824,31 +828,33 @@ onMounted(() => {
             .revenue-row
               .col-source {{ REVENUE_SOURCE_LABELS[source] }}
               .col-amount
-                input.amount-input(
-                  v-model="getRevenue(source).total"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                )
+                .amount-wrap
+                  input.amount-input(
+                    v-model="getRevenue(source).total"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                  )
               .col-amount
-                input.amount-input(
-                  v-if="source.endsWith('_cash')"
-                  v-model="getRevenue(source).change_money"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                )
+                .amount-wrap(v-if="source.endsWith('_cash')")
+                  input.amount-input(
+                    v-model="getRevenue(source).change_money"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                  )
                 span.no-field(v-else) —
               .col-amount
-                input.amount-input(
-                  v-model="getRevenue(source).fees"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                )
+                .amount-wrap
+                  input.amount-input(
+                    v-model="getRevenue(source).fees"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                  )
               .col-amount.col-computed {{ formatCurrency(revenueNet(getRevenue(source))) }}
             template(v-if="(source === 'entrance_cash' || source === 'bar_cash') && expensesFromSource(source) > 0")
               .revenue-row.sub-row.register-payout
@@ -1013,19 +1019,19 @@ onMounted(() => {
       h3.section-title Ausgaben
       .expenses-table
         .expense-header
-          .col-desc.sortable(@click="expSort.toggle('desc')") Beschreibung{{ expSort.indicator('desc') }}
-          .col-amount.sortable(@click="expSort.toggle('amount')") Betrag{{ expSort.indicator('amount') }}
-          .col-from Bezahlt aus
-          .col-action
+          span.sortable(@click="expSort.toggle('desc')") Beschreibung{{ expSort.indicator('desc') }}
+          span.sortable(@click="expSort.toggle('amount')") Betrag{{ expSort.indicator('amount') }}
+          span Bezahlt aus
+          span Sphäre
+          span
 
         .expense-row(v-for="(exp, index) in sortedExpenses" :key="index")
-          .col-desc
-            input.text-input(
-              v-model="exp.description"
-              type="text"
-              placeholder="z.B. Rewe, Hotel..."
-            )
-          .col-amount
+          input.text-input(
+            v-model="exp.description"
+            type="text"
+            placeholder="z.B. Rewe, Hotel..."
+          )
+          .amount-wrap
             input.amount-input(
               v-model="exp.amount"
               type="number"
@@ -1033,18 +1039,37 @@ onMounted(() => {
               min="0"
               placeholder="0.00"
             )
-          .col-from
-            select.select-input(v-model="exp.paid_from")
-              option(v-for="(label, source) in EXPENSE_PAID_FROM_LABELS" :key="source" :value="source")
-                | {{ label }}
-          .col-action
-            button.btn-remove(@click="removeExpense(index)") ×
+          select.select-input(v-model="exp.paid_from")
+            option(v-for="(label, source) in EXPENSE_PAID_FROM_LABELS" :key="source" :value="source")
+              | {{ label }}
+          select.select-input(v-model="exp.tax_sphere" :class="{ 'missing': !exp.tax_sphere }")
+            option(:value="null" disabled hidden) Sphäre wählen
+            option(v-for="(label, key) in TAX_SPHERE_LABELS" :key="key" :value="key")
+              | {{ label }}
+          button.btn-remove(@click="removeExpense(index)") ×
 
       button.btn-add(@click="addExpense") + Ausgabe hinzufügen
 
       .grand-total
         span Gesamtausgaben:
         strong {{ formatCurrency(totalExpenses) }}
+
+      .footnote
+        p
+          strong Sphären-Zuordnung (Pflichtfeld)
+        ul
+          li
+            strong Zweckbetrieb
+            |  — Ausgaben für den Vereinszweck (z.B. Künstlergagen, GEMA, Technik)
+          li
+            strong Wirtschaftlich
+            |  — Ausgaben für wirtschaftlichen Geschäftsbetrieb (z.B. Getränkeeinkauf, Bar-Zubehör)
+          li
+            strong Vermögensverwaltung
+            |  — langfristige Vermietung/Verpachtung (z.B. Proberaum)
+          li
+            strong Ideell
+            |  — allgemeine Vereinsarbeit ohne wirtschaftlichen Bezug
 
     //- ── Result Tab ──
     .tab-content(v-if="activeTab === 'result'")
@@ -1883,12 +1908,25 @@ h2 {
   margin-bottom: 1rem;
 }
 
+.expense-row input,
+.expense-row select {
+  height: 2rem;
+  line-height: 1.2;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
 .expense-header, .expense-row {
   display: grid;
-  grid-template-columns: 1fr 120px 150px 40px;
+  grid-template-columns: 1fr auto auto auto 36px;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   align-items: center;
+}
+
+.expense-row > div {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .grant-expenses .expense-header,
@@ -1984,8 +2022,13 @@ h2 {
   display: block;
 }
 
-.col-desc, .col-from, .col-action, .col-pct {
+.col-desc, .col-from, .col-action, .col-pct, .col-sphere {
   font-size: 0.9rem;
+}
+
+.col-sphere .select-input {
+  font-size: 0.9rem;
+  padding: 0.375rem 0.5rem;
 }
 
 .col-pct {
@@ -2003,6 +2046,39 @@ h2 {
   font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  -moz-appearance: textfield;
+}
+
+.amount-input::-webkit-outer-spin-button,
+.amount-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.amount-wrap {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 2rem;
+}
+
+.amount-wrap input {
+  padding-right: 1.5rem;
+  height: 100%;
+}
+
+.amount-wrap::after {
+  content: '€';
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  font-weight: 600;
+  pointer-events: none;
+  color: #666;
 }
 
 .text-input {
@@ -2012,6 +2088,7 @@ h2 {
   font-size: 0.9rem;
   font-family: inherit;
   font-weight: 600;
+  box-sizing: border-box;
 }
 
 .select-input {
@@ -2022,6 +2099,7 @@ h2 {
   font-family: inherit;
   font-weight: 600;
   background: white;
+  box-sizing: border-box;
 }
 
 .amount-input:focus, .qty-input:focus, .text-input:focus, .select-input:focus {
@@ -2121,6 +2199,31 @@ h2 {
 .grand-total > div, .grand-total > span {
   display: flex;
   justify-content: space-between;
+}
+
+.footnote {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.footnote p {
+  margin: 0.25rem 0;
+}
+
+.footnote ul {
+  margin: 0.25rem 0;
+  padding-left: 1.2rem;
+}
+
+.footnote li {
+  margin: 0.1rem 0;
+}
+
+.select-input.missing {
+  border-color: #c00;
+  color: #999;
 }
 
 .grand-total .separator {
@@ -2338,19 +2441,7 @@ h2 {
   margin-left: auto;
 }
 
-.amount-input {
-  width: 120px;
-  padding: 0.25rem 0.5rem;
-  border: 0.15rem solid black;
-  text-align: right;
-  font-family: inherit;
-  font-size: inherit;
-}
 
-.amount-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 0.15rem rgba(0, 0, 0, 0.3);
-}
 
 .input-group .unit {
   font-size: 0.85rem;

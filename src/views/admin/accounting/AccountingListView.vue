@@ -89,6 +89,7 @@ onMounted(() => {
   .header
     h2 Abrechnung
     .header-actions
+      router-link.btn-export(:to="{ name: 'admin-tax-export' }") EÜR Export
       input.search-input(
         v-model="searchQuery"
         type="text"
@@ -160,6 +161,20 @@ h2 {
   font-size: 0.95rem;
   min-width: 250px;
   font-weight: 600;
+}
+
+.btn-export {
+  padding: 0.625rem 1.25rem;
+  border: 0.25rem solid black;
+  background: black;
+  color: white;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.btn-export:hover {
+  opacity: 0.85;
 }
 
 .search-input:focus {

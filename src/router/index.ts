@@ -138,6 +138,11 @@ const router = createRouter({
           component: () => import('../views/admin/accounting/AccountingListView.vue')
         },
         {
+          path: 'accounting/tax-export',
+          name: 'admin-tax-export',
+          component: () => import('../views/admin/accounting/TaxExportView.vue')
+        },
+        {
           path: 'accounting/:eventId',
           name: 'admin-accounting-detail',
           component: () => import('../views/admin/accounting/AccountingView.vue'),

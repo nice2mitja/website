@@ -253,6 +253,14 @@ onMounted(() => {
         label(for="invoice_total") Rechnungsbetrag (€)
         input#invoice_total(v-model="form.invoice_total" type="number" step="0.01" min="0")
       .form-group
+        label(for="net_amount") Netto (€)
+        input#net_amount(v-model="form.net_amount" type="number" step="0.01" min="0" placeholder="optional")
+      .form-group
+        label(for="vat_amount") USt-Betrag (€)
+        input#vat_amount(v-model="form.vat_amount" type="number" step="0.01" min="0" placeholder="optional")
+
+    .form-row
+      .form-group
         label Berechnete Summe
         .computed-total {{ computedTotal }}
       .form-group

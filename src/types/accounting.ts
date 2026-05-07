@@ -24,6 +24,23 @@ export type RevenueSource =
   | 'vvk_paypal'
   | 'vvk_stripe'
 
+export type TaxSphere = 'zweckbetrieb' | 'wirtschaftlich' | 'vermoegensverwaltung' | 'ideell'
+
+export const TAX_SPHERE_LABELS: Record<TaxSphere, string> = {
+  zweckbetrieb: 'Zweckbetrieb',
+  wirtschaftlich: 'Wirtschaftl. Betrieb',
+  vermoegensverwaltung: 'Vermögensverwaltung',
+  ideell: 'Ideeller Bereich',
+}
+
+export type VatRate = 'none' | '7' | '19'
+
+export const VAT_RATE_LABELS: Record<VatRate, string> = {
+  none: 'Keine USt',
+  '7': '7% (ermäßigt)',
+  '19': '19% (Regelsteuersatz)',
+}
+
 export const REVENUE_SOURCE_LABELS: Record<RevenueSource, string> = {
   bar_cash: 'Bar (Bargeld)',
   bar_paypal: 'Bar (PayPal)',
@@ -46,6 +63,8 @@ export interface RevenueEntry {
   total: string
   change_money: string
   fees: string
+  tax_sphere?: TaxSphere | null
+  vat_rate?: VatRate | null
 }
 
 export interface InventoryEntry {
@@ -79,6 +98,8 @@ export interface ExpenseEntry {
   notes: string
   paid_from: ExpensePaidFrom
   grant_category?: GrantCategory | null
+  tax_sphere?: TaxSphere | null
+  vat_rate?: VatRate | null
   is_paid_out?: boolean
 }
 
@@ -138,8 +159,12 @@ export interface Purchase {
   supplier: string
   invoice_number: string
   invoice_total: string
+  net_amount?: string | null
+  vat_amount?: string | null
   notes: string
   status: PurchaseStatus
+  tax_sphere?: TaxSphere
+  vat_rate?: VatRate
   created_at?: string
   updated_at?: string
   items?: PurchaseItem[]

@@ -423,3 +423,53 @@ export const grantService = {
     URL.revokeObjectURL(url)
   },
 }
+
+// ── Tax Export (EÜR / Sphären) ──────────────────────────────────
+
+export interface TaxSummaryResponse {
+  year: number
+  spheres: Record<string, { label: string; income: number; expense: number; result: number }>
+  vat: { ust_7: number; ust_19: number; ust_total: number; vorsteuer: number; zahllast: number }
+}
+
+export const taxExportService = {
+  async getSummary(year: number): Promise<TaxSummaryResponse> {
+    return api.get<TaxSummaryResponse>(`/api/export/euer/${year}/?output=json`)
+  },
+
+  async downloadExcel(year: number): Promise<void> {
+    const token = localStorage.getItem('access_token')
+    const baseUrl = api.getBaseUrl()
+    const response = await fetch(`${baseUrl}/api/export/euer/${year}/?output=xlsx`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) {
+      throw new Error('Export fehlgeschlagen')
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `EUER_${year}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  async downloadCsv(year: number): Promise<void> {
+    const token = localStorage.getItem('access_token')
+    const baseUrl = api.getBaseUrl()
+    const response = await fetch(`${baseUrl}/api/export/euer/${year}/?output=csv`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) {
+      throw new Error('Export fehlgeschlagen')
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `EUER_${year}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+}
