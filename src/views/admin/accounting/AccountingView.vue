@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { accountingService, beverageService, eventService, pretixService, paypalBarService, grantService, stockService, documentService } from '@/services'
 import type { Event } from '@/services'
-import type { PretixOrderSummary, PayPalBarSummary, EventDocument } from '@/services/accounting'
+import type { PretixOrderSummary, PayPalBarSummary, PayPalCategory, EventDocument } from '@/services/accounting'
 import type {
   EventAccounting,
   RevenueEntry,
@@ -108,6 +108,17 @@ const paypalBarTotals = computed(() => {
   }
 })
 
+const paypalBarCategoryTotals = computed(() => {
+  if (!paypalBarData.value) return { bar: { amount: 0, fees: 0, count: 0 }, entrance: { amount: 0, fees: 0, count: 0 } }
+  const txns = paypalBarData.value.transactions
+  const bar = txns.filter(t => t.category === 'bar')
+  const entrance = txns.filter(t => t.category === 'entrance')
+  return {
+    bar: { amount: bar.reduce((s, t) => s + t.amount, 0), fees: bar.reduce((s, t) => s + t.fee, 0), count: bar.length },
+    entrance: { amount: entrance.reduce((s, t) => s + t.amount, 0), fees: entrance.reduce((s, t) => s + t.fee, 0), count: entrance.length },
+  }
+})
+
 // ── Sorting ──────────────────────────────────────────────────────
 const invSort = useSort<{ beverage: BeverageItem; entry: InventoryEntry }>()
 const expSort = useSort<ExpenseEntry>()
@@ -173,16 +184,33 @@ async function fetchPaypalBarData() {
 
 function applyPaypalBarData() {
   if (!paypalBarData.value) return
-  const t = paypalBarTotals.value
-  const rev = getRevenue('bar_paypal')
-  rev.total = t.amount.toFixed(2)
-  rev.fees = t.fees.toFixed(2)
-  rev.change_money = '0.00'
+  const ct = paypalBarCategoryTotals.value
+  // Apply bar transactions
+  const barRev = getRevenue('bar_paypal')
+  barRev.total = ct.bar.amount.toFixed(2)
+  barRev.fees = ct.bar.fees.toFixed(2)
+  barRev.change_money = '0.00'
+  // Apply entrance transactions
+  const entranceRev = getRevenue('entrance_paypal')
+  entranceRev.total = ct.entrance.amount.toFixed(2)
+  entranceRev.fees = ct.entrance.fees.toFixed(2)
+  entranceRev.change_money = '0.00'
 }
 
 function removePaypalBarTransaction(idx: number) {
   if (!paypalBarData.value) return
   paypalBarData.value.transactions.splice(idx, 1)
+}
+
+function togglePaypalCategory(idx: number) {
+  if (!paypalBarData.value) return
+  const txn = paypalBarData.value.transactions[idx]
+  txn.category = txn.category === 'bar' ? 'entrance' : 'bar'
+}
+
+function setAllPaypalCategory(category: PayPalCategory) {
+  if (!paypalBarData.value) return
+  paypalBarData.value.transactions.forEach(t => { t.category = category })
 }
 
 // ── Computed: Revenue ────────────────────────────────────────────
@@ -886,7 +914,9 @@ onMounted(() => {
             button.btn-pretix.btn-apply(
               v-if="paypalBarData"
               @click="applyPaypalBarData"
-            ) Übernehmen ({{ paypalBarTotals.count }} Transaktionen, {{ formatCurrency(paypalBarTotals.amount) }})
+            ) Übernehmen
+            template(v-if="paypalBarData")
+              span.paypal-cat-summary 🍺 {{ paypalBarCategoryTotals.bar.count }} Bar ({{ formatCurrency(paypalBarCategoryTotals.bar.amount) }}) · 🚪 {{ paypalBarCategoryTotals.entrance.count }} Einlass ({{ formatCurrency(paypalBarCategoryTotals.entrance.amount) }})
             span.pretix-error(v-if="paypalBarError") {{ paypalBarError }}
         .revenue-table
           .revenue-header
@@ -963,8 +993,21 @@ onMounted(() => {
                 .col-amount.sub-val {{ formatCurrency(paypalBarTotals.fees) }}
                 .col-amount.sub-val {{ formatCurrency(paypalBarTotals.net) }}
               template(v-if="paypalBarExpanded")
-                .revenue-row.sub-row.sub-detail(v-for="(txn, idx) in paypalBarData.transactions" :key="idx")
+                .revenue-row.sub-row.paypal-cat-actions
+                  .col-source.sub-source
+                    button.btn-cat-all(@click="setAllPaypalCategory('bar')") Alle → Bar
+                    button.btn-cat-all(@click="setAllPaypalCategory('entrance')") Alle → Einlass
+                    span.entry-price-hint(v-if="paypalBarData.entry_price") Eintritt: {{ paypalBarData.entry_price }}€{{ paypalBarData.entry_price_ak ? ' / AK ' + paypalBarData.entry_price_ak + '€' : '' }}
+                .revenue-row.sub-row.sub-detail(
+                  v-for="(txn, idx) in paypalBarData.transactions"
+                  :key="idx"
+                  :class="{ 'cat-entrance': txn.category === 'entrance', 'cat-bar': txn.category === 'bar' }"
+                )
                   .col-source.sub-source.sub-detail-source
+                    button.btn-cat-toggle(
+                      @click.stop="togglePaypalCategory(idx)"
+                      :title="txn.category === 'bar' ? 'Klick → Einlass' : 'Klick → Bar'"
+                    ) {{ txn.category === 'bar' ? '🍺' : '🚪' }}
                     span └ {{ txn.name }} · {{ formatTime(txn.timestamp) }}
                   .col-amount.sub-val {{ formatCurrency(txn.amount) }}
                   .col-amount.sub-val —
@@ -1915,6 +1958,57 @@ h2 {
   background: black;
   color: white;
   border-color: black;
+}
+
+.btn-cat-toggle {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 0.25rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.btn-cat-toggle:hover {
+  background: #f0f0f0;
+}
+
+.cat-entrance {
+  background: rgba(76, 175, 80, 0.06);
+}
+.cat-bar {
+  background: rgba(255, 152, 0, 0.06);
+}
+
+.btn-cat-all {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  margin-right: 0.3rem;
+  color: #555;
+}
+.btn-cat-all:hover {
+  background: #eee;
+}
+
+.entry-price-hint {
+  font-size: 0.65rem;
+  color: #888;
+  margin-left: 0.3rem;
+}
+
+.paypal-cat-summary {
+  font-size: 0.75rem;
+  color: #555;
+  margin-left: 0.5rem;
+}
+
+.paypal-cat-actions {
+  border-bottom: 1px solid #eee;
 }
 
 .sub-source {

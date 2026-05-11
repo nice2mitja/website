@@ -330,6 +330,8 @@ export const pretixService = {
 
 // ── PayPal Bar Transactions ─────────────────────────────────────
 
+export type PayPalCategory = 'bar' | 'entrance'
+
 export interface PayPalBarTransaction {
   timestamp: string
   name: string
@@ -338,11 +340,14 @@ export interface PayPalBarTransaction {
   fee: number
   net: number
   type: string
+  category: PayPalCategory
 }
 
 export interface PayPalBarSummary {
   event_id: string
   event_date: string
+  entry_price: number | null
+  entry_price_ak: number | null
   search_window: { start: string; end: string }
   transaction_count: number
   total_amount: number
